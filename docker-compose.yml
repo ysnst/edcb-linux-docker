@@ -1,0 +1,15 @@
+services:
+  edcb:
+    build:
+      context: .
+      # 別の upstream ブランチを試す場合は build args を上書きできる
+      # args:
+      #   EDCB_BRANCH: work-plus-s
+      #   EMWUI_REPO: https://github.com/tsukumijima/EDCB_Material_WebUI.git
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./edcb-data:/var/local/edcb
+      # 必要に応じてホスト側の録画先をマウントし、
+      # EDCB 側の録画フォルダ設定にも同じコンテナ内パスを指定する
+      # - /mnt/recordings:/recorded

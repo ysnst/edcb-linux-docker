@@ -1,0 +1,20 @@
+# Runtime data
+/edcb-data/
+
+# Local logs and temporary files
+*.log
+*.tmp
+*.bak
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local agent metadata
+.agents/
+.codex/
+
+# Local artifacts
+/artifacts/
