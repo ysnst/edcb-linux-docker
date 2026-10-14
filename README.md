@@ -1,148 +1,40 @@
 # EDCB Linux Docker
 
-Linux版 EDCB を Docker 上で利用しやすくするための構成です。Linux ネイティブ版 EDCB、BonDriver_LinuxMirakc、Multi2Dec (B25Decoder) をコンテナ内でビルドし、EDCB Material WebUI を初期設定テンプレートに組み込みます。チューナーバックエンドには Mirakurun / mirakc を使います。
+Linux版EDCBをDockerで動かすための構成です。チューナーには、別途用意したMirakurunまたはmirakcを使います。
 
-Windows版 EDCB を Wine で動かすのではなく、Linux ネイティブで動作する EDCB 環境を Docker で再現できるようにすることを目的としています。Wine やデスクトップ環境を含めず、Mirakurun / mirakc を前提にした軽量な構成にしています。EDCB-Wine と完全互換の環境ではありませんが、Linux ネイティブな代替構成・選択肢として使えることを目指しています。
+EDCB、BonDriver_LinuxMirakc、Multi2DecのB25Decoderをイメージ内でビルドし、EDCB Material WebUIを同梱します。WineやGUIデスクトップは使いません。
 
-## 特徴
+## 導入
 
-- Linux ネイティブ版 EDCB を利用
-- Docker による再現可能なビルド
-- Mirakurun / mirakc に対応
-- `BonDriver_LinuxMirakc` を自動ビルドして `/usr/local/lib/edcb/` に配置
-- Multi2Dec の `B25Decoder.so` を自動ビルドして `/usr/local/lib/edcb/` に配置
-- EDCB Material WebUI を初期設定テンプレートに組み込み
-- 初回起動時だけ `edcb-data` に初期設定を自動展開
-- 既存の `edcb-data` は上書きしない
-- Wine、デスクトップ環境、VNC サーバーを含まない
-- EDCB-Wine の Linux ネイティブな代替構成を目指した設計
+LinuxホストにDockerとDocker Compose v2が必要です。先にMirakurunまたはmirakcを起動し、Mirakurun互換APIに接続できる状態にしてください。初期設定の接続先は `localhost:40772` です。
 
-## 対象ユーザー
+Composeは `network_mode: host` を使います。コンテナ内の `localhost` はLinuxホストを指します。Docker Desktopはこの手順の対象外です。
 
-- Linux 上で EDCB を動作させたい
-- Docker で EDCB を運用したい
-- Mirakurun / mirakc を既に利用している
-- Wine を使用したくない
-- Linux ネイティブ版 EDCB を利用したい
-- EDCB-Wine から Linux ネイティブ構成への移行を検討している
-
-## EDCB-Wine との違い
-
-| 項目             | このリポジトリ                                 | EDCB-Wine                                          |
-| ---------------- | ---------------------------------------------- | -------------------------------------------------- |
-| EDCB             | Linux版 EDCB                                   | Windows版 EDCB                                     |
-| Wine             | 使用しない                                     | 使用する                                           |
-| チューナー連携   | Mirakurun / mirakc + BonDriver_LinuxMirakc     | Mirakurun / mirakc + Windows向け BonDriver         |
-| GUI デスクトップ | 含めない                                       | Xfce / noVNC を含む                                |
-| 主な用途         | Linux ネイティブ環境で EDCB を動かしたい人向け | Windows版 EDCB の操作感を Linux 上で使いたい人向け |
-
-EDCB-Wine から移行できる可能性はありますが、完全互換ではありません。設定ファイル、BonDriver、録画パス、Web UI 周りは Linux版 EDCB の前提で確認してください。
-
-## システム構成
-
-```text
-Browser / EpgTimerNW
-        |
-        | HTTP / TCP
-        v
-+-------------------------------+
-| Docker container              |
-|                               |
-|  EpgTimerSrv                  |
-|    |                          |
-|    +-- BonDriver_LinuxMirakc  |
-|    |        |                 |
-|    |        v                 |
-|    |   Mirakurun / mirakc API |
-|    |                          |
-|    +-- B25Decoder.so          |
-|                               |
-|  /var/local/edcb              |
-+-------------------------------+
-        |
-        | host network
-        v
-Host Mirakurun / mirakc :40772
-```
-
-`docker-compose.yml` は `network_mode: host` を使います。Linux ホストでは、コンテナ内の `localhost:40772` がホスト側の Mirakurun / mirakc を指します。
-
-## 動作環境
-
-- Linux ホスト
-- Docker
-- Docker Compose v2
-- Mirakurun または mirakc
-- Mirakurun 互換 API が既定で `localhost:40772` から参照できること
-
-Docker Desktop では host network の挙動が Linux ホストと異なる場合があります。この構成は Linux ホストでの利用を前提にしています。
-
-## ディレクトリ構成
-
-```text
-.
-├── Dockerfile
-├── docker-compose.yml
-├── entrypoint.sh
-├── templates/
-│   └── BonDriver_LinuxMirakc.ini
-├── README.md
-└── edcb-data/        # 初回起動後に作成される設定・実行時データ
-```
-
-`edcb-data` には EDCB の設定、EPG データ、ログ、予約情報などが入ります。利用環境ごとのデータとして扱ってください。
-
-## インストール
-
-リポジトリを配置したディレクトリでビルドします。
+`Dockerfile` と `docker-compose.yml` があるディレクトリで実行します。
 
 ```sh
 docker compose build
-```
-
-ビルド時に、次のリポジトリからソースコードを取得します。Linux版 EDCB、BonDriver_LinuxMirakc、Multi2Dec はコンテナ内でビルドし、EDCB Material WebUI は初期設定テンプレートに配置します。
-
-| 用途                                | 取得元                                                                                | 既定値                 |
-| ----------------------------------- | ------------------------------------------------------------------------------------- | ---------------------- |
-| Linux版 EDCB                        | [xtne6f/EDCB](https://github.com/xtne6f/EDCB)                                         | `work-plus-s` ブランチ |
-| EDCB Material WebUI                 | [tsukumijima/EDCB_Material_WebUI](https://github.com/tsukumijima/EDCB_Material_WebUI) | 既定ブランチ           |
-| Mirakurun / mirakc 連携用 BonDriver | [matching/BonDriver_LinuxMirakc](https://github.com/matching/BonDriver_LinuxMirakc)   | 既定ブランチ           |
-| B25Decoder                          | [tsukumijima/Multi2Dec](https://github.com/tsukumijima/Multi2Dec)                     | 既定ブランチ           |
-
-ビルド対象の upstream やブランチを変えたい場合は、`docker-compose.yml` の `build.args`、または `docker compose build --build-arg` を使ってください。通常は変更不要です。
-
-## 初回起動
-
-コンテナを起動します。
-
-```sh
 docker compose up -d
-```
-
-`./edcb-data` が空の場合だけ、イメージ内の初期設定テンプレートをコピーします。`edcb-data` に既存ファイルがある場合はコピーしません。既存設定を守るため、`EpgTimerSrv.ini` が見つからない場合でも自動上書きは行わず、警告だけを出します。
-
-起動状態を確認します。
-
-```sh
 docker compose ps
 docker compose logs edcb
 ```
 
-Web UI は EDCB の HTTP サーバーを使います。初期設定のままなら、ホストから次の URL にアクセスします。
+初回起動時に、空の `./edcb-data` へ設定ファイルとWeb UIをコピーします。このディレクトリには、以後の設定、予約情報、EPGデータ、ログも保存されます。
 
-```text
-http://localhost:5510/
-```
+ファイルがすでに入っている場合はコピーしません。`EpgTimerSrv.ini` がなくても既存ファイルは上書きせず、ログに警告を出します。イメージを更新しても、既存の設定やWeb UIは自動更新されません。
 
-EDCB Material WebUI は次の URL から開けます。
+HTTPサーバーの設定は `edcb-data/EpgTimerSrv.ini` で確認してください。ポート5510で利用する場合のURLは次のとおりです。
 
-```text
-http://localhost:5510/EMWUI/
-```
+- EDCB Web UI: `http://localhost:5510/`
+- EDCB Material WebUI: `http://localhost:5510/EMWUI/`
 
-## Mirakurun / mirakc 設定
+別のPCから開く場合は、`localhost` をEDCBホストの名前またはIPアドレスに置き換えます。HTTPサーバーのアクセス許可も確認してください。
 
-既定のテンプレートは `localhost:40772` の Mirakurun / mirakc に接続します。
+## チューナーと録画先の設定
+
+### Mirakurun / mirakc
+
+接続先は `edcb-data/BonDriver_LinuxMirakc.ini` で指定します。同じホストで動かしている場合は、初期設定のまま使えます。
 
 ```ini
 [GLOBAL]
@@ -150,162 +42,121 @@ SERVER_HOST=localhost
 SERVER_PORT=40772
 ```
 
-接続先を変える場合は、初回起動後に作成される `edcb-data/BonDriver_LinuxMirakc.ini` を編集します。
+別ホストに接続する場合は `SERVER_HOST` をそのホスト名またはIPアドレスに変更します。APIのポートを変えている場合は `SERVER_PORT` も合わせてください。
 
-```ini
-[GLOBAL]
-SERVER_HOST=<mirakurun-host>
-SERVER_PORT=40772
-```
+EDCB側では、利用するBonDriver、チューナー数、チャンネル設定を確認します。初期設定だけで、利用環境に合うチャンネル構成が揃うとは限りません。
 
-ただし、`network_mode: host` を使う Linux ホストでは `localhost` のままでホスト側サービスへ接続できます。固定 IP を README やテンプレートに直接入れず、必要な環境だけ `edcb-data` 側で変更してください。
+イメージ内のライブラリは次の場所にあります。
 
-## BonDriver_LinuxMirakc
+| ライブラリ | コンテナ内のパス |
+| --- | --- |
+| BonDriver_LinuxMirakc | `/usr/local/lib/edcb/BonDriver_LinuxMirakc.so` |
+| B25Decoder | `/usr/local/lib/edcb/B25Decoder.so` |
 
-`BonDriver_LinuxMirakc.so` は Docker イメージ内の次のパスに配置します。
+復号に関する設定は `edcb-data/BonCtrl.ini` で確認します。B-CAS / ACASやカードリーダーを使う場合は、ホスト側の構成とコンテナからのアクセスも確認してください。
 
-```text
-/usr/local/lib/edcb/BonDriver_LinuxMirakc.so
-```
+### 録画フォルダ
 
-EDCB 側の初期設定では、この BonDriver を使う前提です。Mirakurun / mirakc に登録しているチューナー数やチャンネル構成は、利用環境に合わせて EDCB 側で確認してください。
-
-## B25Decoder
-
-Multi2Dec の `B25Decoder.so` は次のパスに配置します。
-
-```text
-/usr/local/lib/edcb/B25Decoder.so
-```
-
-`BonCtrl.ini` では地上波、BS、CS などの復号処理に `B25Decoder.so` を使う設定になります。B-CAS / ACAS やカードリーダー周りは利用環境に依存するため、ホスト側の構成と Docker のデバイスアクセスを必要に応じて確認してください。
-
-## 設定ファイル
-
-主な設定ファイルは初回起動後に `edcb-data` 配下へ作成されます。
-
-| パス                                  | 内容                                     |
-| ------------------------------------- | ---------------------------------------- |
-| `edcb-data/BonDriver_LinuxMirakc.ini` | Mirakurun / mirakc の接続先              |
-| `edcb-data/EpgTimerSrv.ini`           | EpgTimerSrv の HTTP / TCP / EPG 取得設定 |
-| `edcb-data/BonCtrl.ini`               | 復号ライブラリやチャンネルスキャンの設定 |
-| `edcb-data/Setting/`                  | チャンネル、予約、Web UI などの設定      |
-| `edcb-data/HttpPublic/`               | EDCB の HTTP 公開ファイル                |
-| `edcb-data/HttpPublic/EMWUI/`         | EDCB Material WebUI                      |
-
-`edcb-data` は実行時データです。テンプレートとして再配布せず、自分の環境で使う設定として扱ってください。
-
-## 録画フォルダ
-
-録画ファイルをコンテナ外へ保存する場合は、ホスト側のディレクトリをマウントします。
+ホスト側の録画先をComposeの `volumes` に指定し、EDCBにはコンテナ内のパスを設定します。たとえば、ホストの `/mnt/recordings` へ保存する場合は次のようにします。
 
 ```yaml
 services:
   edcb:
     volumes:
       - ./edcb-data:/var/local/edcb
-      - /mnt/recordings:/recorded
+      - /mnt/recordings:/app/recorded
 ```
 
-その後、EDCB 側の録画フォルダ設定にコンテナ内のパスを指定します。
+この場合、EDCBの録画フォルダは `/app/recorded` です。ホスト側の `/mnt/recordings` をEDCBに指定しても、同じ場所は参照できません。
 
-```text
-/recorded
-```
+既存のマウント先がある場合は、そのコンテナ内パスに合わせてください。ホスト側のディレクトリには、コンテナから書き込める権限が必要です。マウントしていない場所へ録画すると、コンテナの削除で録画ファイルを失うことがあります。
 
-ホスト側の保存先は、Docker コンテナから書き込める権限にしてください。録画先をマウントしない場合、コンテナ内だけに保存される設定になり、コンテナの作り直しや設定変更時に扱いづらくなります。
+## 設定ファイル
 
-## アップデート方法
+ホストの `./edcb-data` は、コンテナ内の `/var/local/edcb` にマウントされます。
 
-通常の更新は、イメージを再ビルドしてコンテナを作り直します。
+| パス | 用途 |
+| --- | --- |
+| `edcb-data/BonDriver_LinuxMirakc.ini` | Mirakurun / mirakcの接続先 |
+| `edcb-data/EpgTimerSrv.ini` | HTTP・TCPサーバー、EPG取得などの設定 |
+| `edcb-data/BonCtrl.ini` | 復号ライブラリ、チャンネルスキャンなどの設定 |
+| `edcb-data/Setting/` | チャンネル、予約、Web UIなどの設定 |
+| `edcb-data/HttpPublic/` | HTTPサーバーの公開ファイル |
+| `edcb-data/HttpPublic/EMWUI/` | EDCB Material WebUI |
+
+`templates/BonDriver_LinuxMirakc.ini` は初回起動用です。起動済みの環境で接続先を変更する場合は、`edcb-data` 側を編集してください。
+
+Windows版EDCBやEDCB-Wineから設定を移す場合は、BonDriver、録画パス、Web UIの設定をLinux版に合わせて確認します。Windows版の設定や操作をそのまま使える構成ではありません。
+
+## 更新
+
+更新前に `edcb-data` をバックアップしてください。削除すると、予約情報やチャンネル設定も失われます。
+
+ベースイメージを更新してビルドする場合は、次のコマンドを使います。
 
 ```sh
 docker compose build --pull
 docker compose up -d
 ```
 
-`edcb-data` はホスト側に残るため、再ビルドしても既存設定は保持されます。upstream の EDCB、BonDriver_LinuxMirakc、Multi2Dec の変更を取り込む場合は、ビルドキャッシュを使わずに再ビルドします。
+EDCBなどの取得元にある変更を取り込む場合は、ビルドキャッシュを使わずに再取得します。
 
 ```sh
 docker compose build --no-cache
 docker compose up -d
 ```
 
-設定変更前や大きな更新前には、`edcb-data` をバックアップしてください。
+どちらも `edcb-data` は保持します。新しいイメージの初期設定やWeb UIを使う場合は、既存ファイルとの差分を確認して更新してください。
 
-## 動作確認
+## 困ったとき
 
-必要な共有ライブラリがイメージに入っているか確認します。
+まずコンテナの状態とログを確認します。
+
+```sh
+docker compose ps
+docker compose logs edcb
+```
+
+### Web UIが開かない
+
+`edcb-data/EpgTimerSrv.ini` のHTTPサーバー設定、ポート、アクセス許可を確認してください。別のPCから接続する場合は、URLのホスト名とホスト側のファイアウォールも確認します。
+
+### Mirakurun / mirakcに接続できない
+
+Mirakurun / mirakcが起動しているか、APIが待ち受けているかを確認します。接続先は `edcb-data/BonDriver_LinuxMirakc.ini` の `SERVER_HOST` と `SERVER_PORT` です。
+
+### チャンネルが出ない、チューナー数が合わない
+
+Mirakurun / mirakc側のチューナー定義と、EDCB側のBonDriver・チャンネル設定を確認してください。
+
+### 録画できない、録画ファイルが見つからない
+
+EDCBの録画フォルダが、Composeでマウントしたコンテナ内のパスを指しているか確認します。保存先ディレクトリの書き込み権限も確認してください。
+
+### ビルドに失敗する
+
+ビルドログで、ソースの取得、Debianパッケージの取得、コンパイルのどこで失敗したかを確認します。キャッシュを使わずにやり直す場合は `docker compose build --no-cache` を使います。
+
+イメージ内にBonDriverとB25Decoderがあるかは、次のコマンドで確認できます。これはファイルの存在確認で、チューナー接続や録画のテストではありません。
 
 ```sh
 docker compose run --rm --entrypoint sh edcb -c \
   "test -f /usr/local/lib/edcb/B25Decoder.so && test -f /usr/local/lib/edcb/BonDriver_LinuxMirakc.so"
 ```
 
-起動後にログを確認します。
+## ビルド元
 
-```sh
-docker compose logs edcb
-```
+ビルド時に以下のソースを取得します。
 
-Mirakurun / mirakc に接続できない場合は、`edcb-data/BonDriver_LinuxMirakc.ini` の `SERVER_HOST` と `SERVER_PORT`、ホスト側の Mirakurun / mirakc の待ち受け状態を確認してください。
+| 用途 | 取得元 | ブランチ |
+| --- | --- | --- |
+| Linux版EDCB | [xtne6f/EDCB](https://github.com/xtne6f/EDCB) | `work-plus-s` |
+| EDCB Material WebUI | [tsukumijima/EDCB_Material_WebUI](https://github.com/tsukumijima/EDCB_Material_WebUI) | 既定ブランチ |
+| BonDriver | [matching/BonDriver_LinuxMirakc](https://github.com/matching/BonDriver_LinuxMirakc) | 既定ブランチ |
+| B25Decoder | [tsukumijima/Multi2Dec](https://github.com/tsukumijima/Multi2Dec) | 既定ブランチ |
 
-## FAQ
-
-### Wine は必要ですか？
-
-不要です。このリポジトリは Linux版 EDCB を使うため、Wine は使いません。
-
-### EDCB-Wine の代替になりますか？
-
-用途によっては代替になります。ただし Windows版 EDCB、Wine、noVNC、Xfce を前提にした操作や設定とは互換ではありません。Linux ネイティブ構成を使いたい場合の選択肢として考えてください。
-
-### Mirakurun ではなく mirakc でも使えますか？
-
-Mirakurun 互換 API を提供していれば利用できます。既定の接続先は `localhost:40772` です。
-
-### `edcb-data` を削除するとどうなりますか？
-
-次回起動時に初期テンプレートが再コピーされます。ただし、予約情報、EPG データ、チャンネル設定、録画関連の設定も消えます。削除前にバックアップしてください。
-
-### 既存設定は上書きされますか？
-
-上書きしません。`entrypoint.sh` は `edcb-data` が空のときだけ初期テンプレートをコピーします。
-
-### 録画フォルダはどこに置けばよいですか？
-
-ホスト側の永続化したいディレクトリを Docker Compose でマウントし、EDCB 側にはコンテナ内のパスを指定します。例では `/mnt/recordings` を `/recorded` としてマウントしています。
-
-## トラブルシューティング
-
-### `http://localhost:5510/` にアクセスできない
-
-`docker compose ps` と `docker compose logs edcb` でコンテナが起動しているか確認してください。`EpgTimerSrv.ini` の HTTP サーバー設定を変更した場合は、ポートやアクセス許可も確認します。
-
-### Mirakurun / mirakc に接続できない
-
-ホスト側で Mirakurun / mirakc が起動しているか確認してください。Linux ホストで `network_mode: host` を使う場合は、通常 `SERVER_HOST=localhost` で接続できます。別ホストの Mirakurun / mirakc を使う場合は、`edcb-data/BonDriver_LinuxMirakc.ini` を編集します。
-
-### チャンネルやチューナー数が合わない
-
-Mirakurun / mirakc 側のチューナー定義と、EDCB 側の BonDriver / チャンネル設定を確認してください。初期設定のまま全環境で正しいチャンネル構成になるわけではありません。
-
-### 録画ファイルが見つからない
-
-EDCB 側の録画フォルダ設定が、Docker Compose でマウントしたコンテナ内パスを指しているか確認してください。ホスト側パスではなく、コンテナ内から見えるパスを指定します。
-
-### ビルドが失敗する
-
-upstream からの取得、Debian パッケージの取得、またはビルド依存関係で失敗している可能性があります。まず `docker compose build --no-cache` で再確認してください。ネットワーク障害や upstream の一時的な変更で失敗する場合もあります。
+取得先はDockerfileの `EDCB_REPO`、`BON_REPO`、`MULTI2DEC_REPO`、`EMWUI_REPO`、EDCBのブランチは `EDCB_BRANCH` で変更できます。Composeの `build.args` または `docker compose build --build-arg` で指定してください。
 
 ## ライセンス
 
-このリポジトリ自体のライセンスは MIT License です。詳細は `LICENSE` を参照してください。
-
-この Docker 構成は、ビルド時に複数の外部プロジェクトを取得して利用します。各プロジェクトのライセンスは、それぞれの upstream を確認してください。
-
-- EDCB
-- EDCB Material WebUI
-- BonDriver_LinuxMirakc
-- Multi2Dec
-- Debian パッケージ群
+このDocker構成はMIT Licenseです。[LICENSE](LICENSE)を参照してください。同梱する各プロジェクトとDebianパッケージには、それぞれのライセンスが適用されます。
